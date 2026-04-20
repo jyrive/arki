@@ -1,6 +1,7 @@
 <script lang="ts">
 	import EventCard from '$lib/components/EventCard.svelte';
 	import ExamsPanel from '$lib/components/ExamsPanel.svelte';
+	import HomeworkPanel from '$lib/components/HomeworkPanel.svelte';
 	import SchoolDayColumns from '$lib/components/SchoolDayColumns.svelte';
 	import Card from '$lib/components/md3/Card.svelte';
 	import { isLesson } from '$lib/utils/classify';
@@ -34,6 +35,8 @@
 	{/each}
 
 	<ExamsPanel exams={data.upcomingExams} heading="Tulevat kokeet" />
+
+	<HomeworkPanel homework={data.recentHomework} heading="Viimeisimmät läksyt" />
 
 	{#if data.events.length === 0}
 		<Card variant="outlined">

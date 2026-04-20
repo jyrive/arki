@@ -143,6 +143,7 @@ async function roleHasSchedule(baseUrl: string, cookie: string, role: Role): Pro
 // ── Schedule (overview JSON) ───────────────────────────────────────────────
 
 interface OverviewGroup {
+	Id?: number;
 	Caption?: string;
 	FullCaption?: string;
 	ShortCaption?: string;
@@ -158,6 +159,26 @@ interface OverviewSlot {
 	Class?: string;
 	DateArray?: string[]; // ["2026-04-20", ...]
 	Groups?: OverviewGroup[];
+}
+
+export interface GroupRef {
+	id: number;
+	caption: string;
+}
+
+export function extractGroups(slots: OverviewSlot[]): GroupRef[] {
+	const seen = new Map<number, GroupRef>();
+	for (const s of slots ?? []) {
+		for (const g of s.Groups ?? []) {
+			if (typeof g.Id === 'number' && !seen.has(g.Id)) {
+				seen.set(g.Id, {
+					id: g.Id,
+					caption: g.FullCaption ?? g.Caption ?? g.ShortCaption ?? `Ryhmä ${g.Id}`
+				});
+			}
+		}
+	}
+	return [...seen.values()];
 }
 
 export function expandSchedule(
@@ -189,20 +210,19 @@ export function expandSchedule(
 	return out;
 }
 
-async function fetchScheduleForRole(
+async function fetchOverview(
 	baseUrl: string,
 	cookie: string,
-	role: Role,
-	fromDate: string,
-	toDate: string
-): Promise<FamilyEvent[]> {
+	role: Role
+): Promise<{ slots: OverviewSlot[]; groups: GroupRef[] }> {
 	const res = await wilmaFetch(baseUrl, `/!${role.slug}/overview`, cookie);
-	if (!res.ok) return [];
+	if (!res.ok) return { slots: [], groups: [] };
 	try {
 		const data = (await res.json()) as { Schedule?: OverviewSlot[] };
-		return expandSchedule(data.Schedule ?? [], role, fromDate, toDate);
+		const slots = data.Schedule ?? [];
+		return { slots, groups: extractGroups(slots) };
 	} catch {
-		return [];
+		return { slots: [], groups: [] };
 	}
 }
 
@@ -295,6 +315,79 @@ async function fetchExamsForRole(
 		}));
 }
 
+// ── Homework (HTML scrape of /!<slug>/groups/<id>) ────────────────────────
+
+export interface ParsedHomework {
+	date: string;
+	text: string;
+}
+
+/**
+ * Parses a group page and returns the rows under <h3>Kotitehtävät</h3>.
+ * Each row is a `<tr>` with two `<td>`s: date (dd.mm.yyyy) and description.
+ */
+export function parseHomeworkHtml(html: string): ParsedHomework[] {
+	const sectionStart = html.search(/<h3[^>]*>\s*Kotitehtävät\s*<\/h3>/i);
+	if (sectionStart < 0) return [];
+	// Find the next </table> after the heading. That's the homework table.
+	const after = html.slice(sectionStart);
+	const tableMatch = after.match(/<table[^>]*>([\s\S]*?)<\/table>/);
+	if (!tableMatch) return [];
+	const tbody = tableMatch[1];
+
+	const rows: ParsedHomework[] = [];
+	const rowRe = /<tr>\s*<td[^>]*>([^<]+)<\/td>\s*<td[^>]*>([\s\S]*?)<\/td>\s*<\/tr>/g;
+	let m: RegExpExecArray | null;
+	while ((m = rowRe.exec(tbody))) {
+		const date = parseFinnishDate(m[1]);
+		if (!date) continue;
+		const text = m[2].replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+		if (!text) continue;
+		rows.push({ date, text });
+	}
+	return rows;
+}
+
+async function fetchHomeworkForGroup(
+	baseUrl: string,
+	cookie: string,
+	role: Role,
+	group: GroupRef,
+	fromDate: string,
+	toDate: string
+): Promise<FamilyEvent[]> {
+	const res = await wilmaFetch(baseUrl, `/!${role.slug}/groups/${group.id}`, cookie);
+	if (!res.ok) return [];
+	const html = await res.text();
+	const rows = parseHomeworkHtml(html);
+	return rows
+		.filter((r) => r.date >= fromDate && r.date <= toDate)
+		.map((r) => ({
+			id: `wilma:hw:${role.slug}:${group.id}:${r.date}:${r.text}`.slice(0, 220),
+			source: 'wilma' as const,
+			title: `Läksy · ${group.caption} · ${r.text}`.slice(0, 200),
+			start: r.date,
+			end: r.date,
+			allDay: true,
+			person: role.name,
+			raw: { group, homework: r }
+		}));
+}
+
+async function fetchHomeworkForRole(
+	baseUrl: string,
+	cookie: string,
+	role: Role,
+	groups: GroupRef[],
+	fromDate: string,
+	toDate: string
+): Promise<FamilyEvent[]> {
+	const batches = await Promise.all(
+		groups.map((g) => fetchHomeworkForGroup(baseUrl, cookie, role, g, fromDate, toDate))
+	);
+	return batches.flat();
+}
+
 // ── Aggregator ─────────────────────────────────────────────────────────────
 
 export async function fetchWilmaEvents(from: Date, to: Date): Promise<SourceResult> {
@@ -307,15 +400,22 @@ export async function fetchWilmaEvents(from: Date, to: Date): Promise<SourceResu
 		const fromDate = from.toISOString().slice(0, 10);
 		const toDate = to.toISOString().slice(0, 10);
 
-		// Every role may be a student (parent sees "(huoltaja)" suffix for children
-		// they guard — empty roles naturally produce zero events).
+		// Homework is "what was given today", past-dated; widen the window so we
+		// always surface the last 21 days regardless of what the caller asked for.
+		const today = new Date();
+		const hwFromDate = new Date(today.getTime() - 21 * 864e5).toISOString().slice(0, 10);
+		const hwFrom = fromDate < hwFromDate ? fromDate : hwFromDate;
+		const hwTo = toDate > hwFromDate ? toDate : today.toISOString().slice(0, 10);
+
 		const batches = await Promise.all(
 			s.roles.map(async (r) => {
-				const [sched, exams] = await Promise.all([
-					fetchScheduleForRole(s.baseUrl, s.cookie, r, fromDate, toDate),
-					fetchExamsForRole(s.baseUrl, s.cookie, r, fromDate, toDate)
+				const { slots, groups } = await fetchOverview(s.baseUrl, s.cookie, r);
+				const lessons = expandSchedule(slots, r, fromDate, toDate);
+				const [exams, homework] = await Promise.all([
+					fetchExamsForRole(s.baseUrl, s.cookie, r, fromDate, toDate),
+					fetchHomeworkForRole(s.baseUrl, s.cookie, r, groups, hwFrom, hwTo)
 				]);
-				return [...sched, ...exams];
+				return [...lessons, ...exams, ...homework];
 			})
 		);
 

@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { aggregate } from '$lib/server/aggregate';
 import { startOfWeek, endOfWeek } from '$lib/utils/date';
-import { isExam } from '$lib/utils/classify';
+import { isExam, isHomework } from '$lib/utils/classify';
 
 export const load: PageServerLoad = async () => {
 	const now = new Date();
@@ -9,9 +9,13 @@ export const load: PageServerLoad = async () => {
 	const upcomingExams = result.events
 		.filter(isExam)
 		.sort((a, b) => a.start.localeCompare(b.start));
+	const recentHomework = result.events
+		.filter(isHomework)
+		.sort((a, b) => b.start.localeCompare(a.start));
 	return {
 		...result,
-		events: result.events.filter((e) => !isExam(e)),
-		upcomingExams
+		events: result.events.filter((e) => !isExam(e) && !isHomework(e)),
+		upcomingExams,
+		recentHomework
 	};
 };
