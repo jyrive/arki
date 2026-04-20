@@ -38,6 +38,7 @@ interface Session {
 }
 
 let session: Session | null = null;
+let sessionPromise: Promise<Session> | null = null;
 
 function config() {
 	return {
@@ -117,16 +118,24 @@ async function ensureSession(): Promise<Session> {
 	if (session && session.baseUrl === baseUrl && Date.now() - session.at < SESSION_TTL_MS) {
 		return session;
 	}
-	const cookie = await login(baseUrl, username, password);
-	const allRoles = await discoverRoles(baseUrl, cookie);
-	// Drop inactive roles (past school years, empty parent shells). A role is
-	// "active" only if its /overview returns at least one schedule slot.
-	const activeChecks = await Promise.all(
-		allRoles.map(async (r) => ({ role: r, active: await roleHasSchedule(baseUrl, cookie, r) }))
-	);
-	const roles = activeChecks.filter((x) => x.active).map((x) => x.role);
-	session = { cookie, baseUrl, at: Date.now(), roles };
-	return session;
+	// Serialize: if a login is already in flight, wait for it instead of
+	// starting a second parallel login (which Wilma invalidates).
+	if (sessionPromise) return sessionPromise;
+	sessionPromise = (async () => {
+		const cookie = await login(baseUrl, username, password);
+		const allRoles = await discoverRoles(baseUrl, cookie);
+		const activeChecks = await Promise.all(
+			allRoles.map(async (r) => ({ role: r, active: await roleHasSchedule(baseUrl, cookie, r) }))
+		);
+		const roles = activeChecks.filter((x) => x.active).map((x) => x.role);
+		session = { cookie, baseUrl, at: Date.now(), roles };
+		return session;
+	})();
+	try {
+		return await sessionPromise;
+	} finally {
+		sessionPromise = null;
+	}
 }
 
 async function roleHasSchedule(baseUrl: string, cookie: string, role: Role): Promise<boolean> {
@@ -356,22 +365,41 @@ async function fetchHomeworkForGroup(
 	fromDate: string,
 	toDate: string
 ): Promise<FamilyEvent[]> {
-	const res = await wilmaFetch(baseUrl, `/!${role.slug}/groups/${group.id}`, cookie);
-	if (!res.ok) return [];
-	const html = await res.text();
-	const rows = parseHomeworkHtml(html);
-	return rows
-		.filter((r) => r.date >= fromDate && r.date <= toDate)
-		.map((r) => ({
-			id: `wilma:hw:${role.slug}:${group.id}:${r.date}:${r.text}`.slice(0, 220),
-			source: 'wilma' as const,
-			title: `Läksy · ${group.caption} · ${r.text}`.slice(0, 200),
-			start: r.date,
-			end: r.date,
-			allDay: true,
-			person: role.name,
-			raw: { group, homework: r }
-		}));
+	try {
+		const res = await wilmaFetch(baseUrl, `/!${role.slug}/groups/${group.id}`, cookie);
+		if (!res.ok) return [];
+		const html = await res.text();
+		const rows = parseHomeworkHtml(html);
+		return rows
+			.filter((r) => r.date >= fromDate && r.date <= toDate)
+			.map((r) => ({
+				id: `wilma:hw:${role.slug}:${group.id}:${r.date}:${r.text}`.slice(0, 220),
+				source: 'wilma' as const,
+				title: `Läksy · ${group.caption} · ${r.text}`.slice(0, 200),
+				start: r.date,
+				end: r.date,
+				allDay: true,
+				person: role.name,
+				raw: { group, homework: r }
+			}));
+	} catch (err) {
+		console.warn(`[wilma] homework fetch failed for ${role.slug}/${group.id}:`, err);
+		return [];
+	}
+}
+
+/** Run tasks with a small concurrency cap so Wilma doesn't see a burst. */
+async function mapLimit<T, U>(items: T[], limit: number, fn: (x: T) => Promise<U>): Promise<U[]> {
+	const out: U[] = new Array(items.length);
+	let i = 0;
+	async function worker() {
+		while (i < items.length) {
+			const idx = i++;
+			out[idx] = await fn(items[idx]);
+		}
+	}
+	await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+	return out;
 }
 
 async function fetchHomeworkForRole(
@@ -382,8 +410,8 @@ async function fetchHomeworkForRole(
 	fromDate: string,
 	toDate: string
 ): Promise<FamilyEvent[]> {
-	const batches = await Promise.all(
-		groups.map((g) => fetchHomeworkForGroup(baseUrl, cookie, role, g, fromDate, toDate))
+	const batches = await mapLimit(groups, 4, (g) =>
+		fetchHomeworkForGroup(baseUrl, cookie, role, g, fromDate, toDate)
 	);
 	return batches.flat();
 }
@@ -409,13 +437,21 @@ export async function fetchWilmaEvents(from: Date, to: Date): Promise<SourceResu
 
 		const batches = await Promise.all(
 			s.roles.map(async (r) => {
-				const { slots, groups } = await fetchOverview(s.baseUrl, s.cookie, r);
-				const lessons = expandSchedule(slots, r, fromDate, toDate);
-				const [exams, homework] = await Promise.all([
-					fetchExamsForRole(s.baseUrl, s.cookie, r, fromDate, toDate),
-					fetchHomeworkForRole(s.baseUrl, s.cookie, r, groups, hwFrom, hwTo)
-				]);
-				return [...lessons, ...exams, ...homework];
+				try {
+					const { slots, groups } = await fetchOverview(s.baseUrl, s.cookie, r);
+					const lessons = expandSchedule(slots, r, fromDate, toDate);
+					const [exams, homework] = await Promise.all([
+						fetchExamsForRole(s.baseUrl, s.cookie, r, fromDate, toDate).catch((e) => {
+							console.warn(`[wilma] exams fetch failed for ${r.slug}:`, e);
+							return [] as FamilyEvent[];
+						}),
+						fetchHomeworkForRole(s.baseUrl, s.cookie, r, groups, hwFrom, hwTo)
+					]);
+					return [...lessons, ...exams, ...homework];
+				} catch (e) {
+					console.warn(`[wilma] role ${r.slug} failed:`, e);
+					return [] as FamilyEvent[];
+				}
 			})
 		);
 
