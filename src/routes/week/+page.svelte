@@ -1,8 +1,10 @@
 <script lang="ts">
 	import EventCard from '$lib/components/EventCard.svelte';
 	import ExamsPanel from '$lib/components/ExamsPanel.svelte';
+	import SchoolDayColumns from '$lib/components/SchoolDayColumns.svelte';
 	import Card from '$lib/components/md3/Card.svelte';
 	import { groupByDay, formatDayHeading, startOfWeek, addDays } from '$lib/utils/date';
+	import { isLesson } from '$lib/utils/classify';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -18,7 +20,7 @@
 	});
 </script>
 
-<section class="mx-auto w-full max-w-3xl space-y-6">
+<section class="mx-auto w-full max-w-4xl space-y-6">
 	<header class="px-1 pt-2">
 		<p class="text-label-lg text-on-surface-variant uppercase tracking-wide">This week</p>
 		<h2 class="text-headline-md text-on-surface font-medium">Agenda</h2>
@@ -37,16 +39,21 @@
 
 	{#each weekDays as day (day)}
 		{@const events = grouped.get(day) ?? []}
+		{@const lessons = events.filter(isLesson)}
+		{@const others = events.filter((e) => !isLesson(e))}
 		<div class="space-y-2">
 			<h3 class="text-title-md text-on-surface px-1 font-medium">{formatDayHeading(day)}</h3>
 			{#if events.length === 0}
 				<p class="text-body-sm text-on-surface-variant px-1">—</p>
 			{:else}
-				<div class="space-y-2">
-					{#each events as event (event.id)}
-						<EventCard {event} />
-					{/each}
-				</div>
+				<SchoolDayColumns events={lessons} />
+				{#if others.length > 0}
+					<div class="space-y-2">
+						{#each others as event (event.id)}
+							<EventCard {event} />
+						{/each}
+					</div>
+				{/if}
 			{/if}
 		</div>
 	{/each}

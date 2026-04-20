@@ -118,9 +118,26 @@ async function ensureSession(): Promise<Session> {
 		return session;
 	}
 	const cookie = await login(baseUrl, username, password);
-	const roles = await discoverRoles(baseUrl, cookie);
+	const allRoles = await discoverRoles(baseUrl, cookie);
+	// Drop inactive roles (past school years, empty parent shells). A role is
+	// "active" only if its /overview returns at least one schedule slot.
+	const activeChecks = await Promise.all(
+		allRoles.map(async (r) => ({ role: r, active: await roleHasSchedule(baseUrl, cookie, r) }))
+	);
+	const roles = activeChecks.filter((x) => x.active).map((x) => x.role);
 	session = { cookie, baseUrl, at: Date.now(), roles };
 	return session;
+}
+
+async function roleHasSchedule(baseUrl: string, cookie: string, role: Role): Promise<boolean> {
+	try {
+		const res = await wilmaFetch(baseUrl, `/!${role.slug}/overview`, cookie);
+		if (!res.ok) return false;
+		const data = (await res.json()) as { Schedule?: unknown[] };
+		return Array.isArray(data.Schedule) && data.Schedule.length > 0;
+	} catch {
+		return false;
+	}
 }
 
 // ── Schedule (overview JSON) ───────────────────────────────────────────────

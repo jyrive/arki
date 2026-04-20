@@ -4,3 +4,8 @@ import type { FamilyEvent } from '$lib/types/event';
 export function isExam(e: FamilyEvent): boolean {
 	return e.source === 'wilma' && e.allDay && e.title.startsWith('Koe');
 }
+
+/** A timed Wilma lesson — belongs in the per-child school-day columns. */
+export function isLesson(e: FamilyEvent): boolean {
+	return e.source === 'wilma' && !e.allDay;
+}
