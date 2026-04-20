@@ -1,5 +1,6 @@
 <script lang="ts">
 	import EventCard from '$lib/components/EventCard.svelte';
+	import ExamsPanel from '$lib/components/ExamsPanel.svelte';
 	import Card from '$lib/components/md3/Card.svelte';
 	import { groupByDay, formatDayHeading, startOfWeek, addDays } from '$lib/utils/date';
 	import type { PageData } from './$types';
@@ -31,6 +32,8 @@
 			</Card>
 		{/if}
 	{/each}
+
+	<ExamsPanel exams={data.upcomingExams} heading="Kokeet tällä viikolla" />
 
 	{#each weekDays as day (day)}
 		{@const events = grouped.get(day) ?? []}

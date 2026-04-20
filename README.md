@@ -47,9 +47,31 @@ pnpm preview   # preview the build
 
 - ✅ Phase 0 — App skeleton, MD3 tokens, responsive layout
 - ✅ Phase 1 — Google Calendar (Today + Week)
-- ⏳ Phase 2 — Wilma (unofficial REST API)
+- ✅ Phase 2 — Wilma (schedule, exams, homework, messages)
 - 🗒️ Phase 3 — MyClub (planning only; stub in place)
 - ⏳ Phase 4 — Polish: dark-mode toggle, filter chips, PWA, a11y pass
+
+## Wilma setup
+
+Wilma has no official API — we reverse-engineer the JSON the web UI uses, and
+endpoints vary per school. Add to `.env`:
+
+```
+WILMA_BASE_URL=https://helsinki.inschool.fi
+WILMA_USERNAME=your.parent.login
+WILMA_PASSWORD=...
+```
+
+Then probe what your school actually returns:
+
+```bash
+pnpm wilma:probe                     # dumps login, homepage role links, account info
+WILMA_PROBE_SLUG=<slug> pnpm wilma:probe   # then probe child-scoped endpoints
+pnpm wilma:probe -- --write wilma-out/     # optional: save raw responses
+```
+
+Use the shapes it prints to adjust the mappers in
+`src/lib/server/sources/wilma.ts` if fields differ from the defaults.
 
 ## Project layout
 

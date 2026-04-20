@@ -11,7 +11,8 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "token:google": "node scripts/get-google-token.mjs"
+    "token:google": "node scripts/get-google-token.mjs",
+    "wilma:probe": "node scripts/wilma-probe.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
