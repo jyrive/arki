@@ -438,9 +438,16 @@ export async function wilmaSession(): Promise<Session | null> {
 	try {
 		return await ensureSession();
 	} catch (err) {
-		console.warn('[wilma] session failed:', err);
+		const msg = err instanceof Error ? err.message : String(err);
+		console.warn('[wilma] session failed:', msg, err instanceof Error ? err.stack : '');
+		lastSessionError = msg;
 		return null;
 	}
+}
+
+let lastSessionError: string | null = null;
+export function lastWilmaSessionError(): string | null {
+	return lastSessionError;
 }
 
 /**

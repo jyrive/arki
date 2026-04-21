@@ -7,6 +7,7 @@ import { hasDb } from '$lib/server/db';
 import type { EventSource, FamilyEvent } from '$lib/types/event';
 import {
 	wilmaSession,
+	lastWilmaSessionError,
 	wilmaRoles,
 	fetchWilmaOverviewGroups,
 	fetchWilmaLessons,
@@ -184,7 +185,7 @@ async function handle(request: Request) {
 		const reason =
 			missingWilma.length > 0
 				? `missing env: WILMA_${missingWilma.join(', WILMA_').replace(/WILMA_WILMA_/g, 'WILMA_')}`
-				: 'login failed (check WILMA_USERNAME/PASSWORD; see Vercel logs)';
+				: `login failed: ${lastWilmaSessionError() ?? 'unknown'}`;
 		reports.push({
 			source: 'wilma',
 			kind: 'lesson',
