@@ -209,5 +209,25 @@ async function handle(request: Request) {
 	return json({ ok, at: now.toISOString(), reports }, { status: ok ? 200 : 207 });
 }
 
-export const GET: RequestHandler = ({ request }) => handle(request);
-export const POST: RequestHandler = ({ request }) => handle(request);
+export const GET: RequestHandler = async ({ request }) => {
+	try {
+		return await handle(request);
+	} catch (err) {
+		if (err instanceof Response) throw err;
+		const msg = err instanceof Error ? err.message : String(err);
+		const stack = err instanceof Error ? err.stack : undefined;
+		console.error('[cron] fatal:', msg, stack);
+		return json({ ok: false, error: msg }, { status: 500 });
+	}
+};
+export const POST: RequestHandler = async ({ request }) => {
+	try {
+		return await handle(request);
+	} catch (err) {
+		if (err instanceof Response) throw err;
+		const msg = err instanceof Error ? err.message : String(err);
+		const stack = err instanceof Error ? err.stack : undefined;
+		console.error('[cron] fatal:', msg, stack);
+		return json({ ok: false, error: msg }, { status: 500 });
+	}
+};

@@ -3,6 +3,7 @@ import { fetchGoogleEvents } from './sources/google';
 import { fetchWilmaEvents } from './sources/wilma';
 import { fetchMyClubEvents } from './sources/myclub';
 import { hasDb } from './db';
+import { migrate } from './migrate';
 import { selectEvents, selectSourceRuns } from './store';
 
 interface CacheEntry {
@@ -36,6 +37,8 @@ export async function aggregate(from: Date, to: Date): Promise<AggregateResult> 
 
 /** DB-backed path (cron keeps it warm). */
 async function aggregateFromDb(from: Date, to: Date): Promise<AggregateResult> {
+	// Ensure tables exist on first hit (e.g. fresh Neon project before cron runs).
+	await migrate();
 	const [events, runs] = await Promise.all([selectEvents(from, to), selectSourceRuns()]);
 
 	// Roll up source_runs → SourceResult (one per source). An error at any kind
