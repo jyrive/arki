@@ -48,9 +48,22 @@ function config() {
 	};
 }
 
+const BROWSER_UA =
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+const BROWSER_HEADERS: Record<string, string> = {
+	'user-agent': BROWSER_UA,
+	'accept-language': 'fi-FI,fi;q=0.9,en;q=0.8',
+	'sec-ch-ua': '"Chromium";v="124", "Not-A.Brand";v="99"',
+	'sec-ch-ua-mobile': '?0',
+	'sec-ch-ua-platform': '"macOS"'
+};
+
 async function login(baseUrl: string, username: string, password: string): Promise<string> {
 	// Pre-login GET establishes a session identifier Wilma requires.
-	const pre = await fetch(`${baseUrl}/login`, { redirect: 'manual' });
+	const pre = await fetch(`${baseUrl}/login`, {
+		redirect: 'manual',
+		headers: { ...BROWSER_HEADERS, accept: 'text/html,application/xhtml+xml' }
+	});
 	const preHeaders = pre.headers as Headers & { getSetCookie?: () => string[] };
 	const preCookies = (preHeaders.getSetCookie?.() ?? [])
 		.map((c) => c.split(';')[0])
@@ -68,9 +81,12 @@ async function login(baseUrl: string, username: string, password: string): Promi
 	const res = await fetch(`${baseUrl}/login`, {
 		method: 'POST',
 		headers: {
+			...BROWSER_HEADERS,
 			'content-type': 'application/x-www-form-urlencoded',
+			accept: 'application/json, text/plain, */*',
 			cookie: preCookies.join('; '),
-			referer: `${baseUrl}/login`
+			referer: `${baseUrl}/login`,
+			origin: baseUrl
 		},
 		body,
 		redirect: 'manual'
@@ -79,16 +95,20 @@ async function login(baseUrl: string, username: string, password: string): Promi
 	const sid = (resHeaders.getSetCookie?.() ?? [])
 		.map((c) => c.split(';')[0])
 		.find((c) => c.startsWith('Wilma2SID='));
-	if (!sid) throw new Error(`Wilma login failed (status ${res.status})`);
+	if (!sid) {
+		const snippet = (await res.text().catch(() => '')).slice(0, 200).replace(/\s+/g, ' ');
+		throw new Error(`Wilma login failed (status ${res.status}) ${snippet}`);
+	}
 	return sid;
 }
 
 async function wilmaFetch(baseUrl: string, path: string, cookie: string): Promise<Response> {
 	return fetch(`${baseUrl}${path}`, {
 		headers: {
+			...BROWSER_HEADERS,
 			cookie,
 			accept: 'application/json, text/html;q=0.9',
-			'user-agent': 'arki-dashboard/1.0'
+			referer: `${baseUrl}/`
 		}
 	});
 }
