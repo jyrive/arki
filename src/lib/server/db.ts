@@ -1,31 +1,38 @@
-import { neon, neonConfig } from '@neondatabase/serverless';
+import Database from 'better-sqlite3';
+import { mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 const env = process.env;
 
-// Use secure fetch in all environments.
-neonConfig.fetchConnectionCache = true;
+function dbPath(): string | null {
+	const p = env.SQLITE_PATH?.trim();
+	if (!p) return null;
+	return resolve(p);
+}
 
 /**
- * Returns true when a Postgres database is configured. Pages and cron both
+ * Returns true when a SQLite database path is configured. Pages and cron
  * probe this; when false, the app falls back to live-fetch every request.
  */
 export function hasDb(): boolean {
-	return Boolean(env.DATABASE_URL);
+	return Boolean(dbPath());
 }
 
-let cached: ReturnType<typeof neon> | null = null;
+let cached: Database.Database | null = null;
 
 /**
- * Tagged-template Neon HTTP client. Throws if `DATABASE_URL` isn't set — call
- * `hasDb()` first.
- *
- * Usage:
- *   const rows = await sql`SELECT 1 AS v`;
+ * Returns a singleton better-sqlite3 connection. Throws if `SQLITE_PATH`
+ * isn't set — call `hasDb()` first.
  */
-export function getSql() {
-	if (!env.DATABASE_URL) {
-		throw new Error('DATABASE_URL not configured');
-	}
-	if (!cached) cached = neon(env.DATABASE_URL);
-	return cached;
+export function getDb(): Database.Database {
+	if (cached) return cached;
+	const p = dbPath();
+	if (!p) throw new Error('SQLITE_PATH not configured');
+	mkdirSync(dirname(p), { recursive: true });
+	const db = new Database(p);
+	db.pragma('journal_mode = WAL');
+	db.pragma('synchronous = NORMAL');
+	db.pragma('foreign_keys = ON');
+	cached = db;
+	return db;
 }

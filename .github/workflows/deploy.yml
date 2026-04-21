@@ -25,6 +25,7 @@ jobs:
             git fetch --all
             git reset --hard origin/main
             pnpm install --frozen-lockfile
+            pnpm rebuild better-sqlite3
             pnpm build
             systemctl restart arki.service
             systemctl status arki.service --no-pager | head -5
