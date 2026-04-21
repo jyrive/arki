@@ -24,13 +24,13 @@ const FINNISH_MONTHS: Record<string, string> = {
 	heinä: '07', elo: '08', syys: '09', loka: '10', marras: '11', joulu: '12'
 };
 
-interface Role {
+export interface Role {
 	slug: string;
 	name: string;
 	isGuardianSelf: boolean; // parent's "huoltaja" role — skip scheduling, used for context
 }
 
-interface Session {
+export interface Session {
 	cookie: string;
 	baseUrl: string;
 	at: number;
@@ -160,7 +160,7 @@ interface OverviewGroup {
 	Teachers?: Array<{ LongCaption?: string; Caption?: string }>;
 }
 
-interface OverviewSlot {
+export interface OverviewSlot {
 	ReservationID: number;
 	ScheduleID: number;
 	Start: string; // "HH:MM"
@@ -417,6 +417,78 @@ async function fetchHomeworkForRole(
 }
 
 // ── Aggregator ─────────────────────────────────────────────────────────────
+
+/**
+ * Expose the internal session handle so the cron can call per-kind fetchers
+ * without re-logging-in between them. Returns null when Wilma isn't configured.
+ */
+export async function wilmaSession(): Promise<Session | null> {
+	const { baseUrl, username, password } = config();
+	if (!baseUrl || !username || !password) return null;
+	try {
+		return await ensureSession();
+	} catch (err) {
+		console.warn('[wilma] session failed:', err);
+		return null;
+	}
+}
+
+/**
+ * Invalidate the cached session — call from cron after a 401/403 so the next
+ * run re-logs-in. The aggregator already does this on errors, but cron handles
+ * per-kind errors separately.
+ */
+export function invalidateWilmaSession() {
+	session = null;
+}
+
+/** Fetch lessons for a single role within [fromDate, toDate] (inclusive date-only). */
+export async function fetchWilmaLessons(
+	s: Session,
+	role: Role,
+	fromDate: string,
+	toDate: string
+): Promise<FamilyEvent[]> {
+	const { slots } = await fetchOverview(s.baseUrl, s.cookie, role);
+	return expandSchedule(slots, role, fromDate, toDate);
+}
+
+/** Fetch exams for a single role. */
+export async function fetchWilmaExams(
+	s: Session,
+	role: Role,
+	fromDate: string,
+	toDate: string
+): Promise<FamilyEvent[]> {
+	return fetchExamsForRole(s.baseUrl, s.cookie, role, fromDate, toDate);
+}
+
+/**
+ * Fetch homework for a single role. Needs the role's group list (obtainable
+ * from `fetchWilmaOverviewGroups`).
+ */
+export async function fetchWilmaHomework(
+	s: Session,
+	role: Role,
+	groups: GroupRef[],
+	fromDate: string,
+	toDate: string
+): Promise<FamilyEvent[]> {
+	return fetchHomeworkForRole(s.baseUrl, s.cookie, role, groups, fromDate, toDate);
+}
+
+/** Fetch a role's overview once; cron reuses it for lessons + groups. */
+export async function fetchWilmaOverviewGroups(
+	s: Session,
+	role: Role
+): Promise<{ slots: OverviewSlot[]; groups: GroupRef[] }> {
+	return fetchOverview(s.baseUrl, s.cookie, role);
+}
+
+/** Roles discovered for the configured account. */
+export function wilmaRoles(s: Session): Role[] {
+	return s.roles;
+}
 
 export async function fetchWilmaEvents(from: Date, to: Date): Promise<SourceResult> {
 	const { baseUrl, username, password } = config();

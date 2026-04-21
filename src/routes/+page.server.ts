@@ -5,25 +5,28 @@ import { isExam, isHomework } from '$lib/utils/classify';
 
 export const load: PageServerLoad = async () => {
 	const now = new Date();
-	const [today, horizon] = await Promise.all([
-		aggregate(startOfDay(now), endOfDay(now)),
-		aggregate(startOfDay(now), endOfDay(addDays(now, 14)))
-	]);
-	const upcomingExams = horizon.events
-		.filter(isExam)
-		.sort((a, b) => a.start.localeCompare(b.start));
+	// One wide range covers: today's timeline, +14d exams, -7d homework.
+	const windowStart = startOfDay(addDays(now, -7));
+	const windowEnd = endOfDay(addDays(now, 14));
+	const data = await aggregate(windowStart, windowEnd);
 
-	// Homework: Wilma source surfaces the last 21 days regardless of window.
-	// Keep only the most recent ~7 days so the panel stays focused.
-	const recentCutoff = addDays(now, -7).toISOString().slice(0, 10);
-	const recentHomework = today.events
+	const todayIso = now.toISOString().slice(0, 10);
+	const horizonIso = addDays(now, 14).toISOString().slice(0, 10);
+	const homeworkFromIso = addDays(now, -7).toISOString().slice(0, 10);
+
+	const todayEvents = data.events.filter((e) => e.start.slice(0, 10) === todayIso);
+	const upcomingExams = data.events
+		.filter(isExam)
+		.filter((e) => e.start >= todayIso && e.start <= horizonIso)
+		.sort((a, b) => a.start.localeCompare(b.start));
+	const recentHomework = data.events
 		.filter(isHomework)
-		.filter((e) => e.start >= recentCutoff)
+		.filter((e) => e.start >= homeworkFromIso && e.start <= todayIso)
 		.sort((a, b) => b.start.localeCompare(a.start));
 
 	return {
-		...today,
-		events: today.events.filter((e) => !isExam(e) && !isHomework(e)),
+		...data,
+		events: todayEvents.filter((e) => !isExam(e) && !isHomework(e)),
 		upcomingExams,
 		recentHomework
 	};
