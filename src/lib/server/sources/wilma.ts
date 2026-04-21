@@ -424,7 +424,17 @@ async function fetchHomeworkForRole(
  */
 export async function wilmaSession(): Promise<Session | null> {
 	const { baseUrl, username, password } = config();
-	if (!baseUrl || !username || !password) return null;
+	if (!baseUrl || !username || !password) {
+		const missing = [
+			!baseUrl && 'WILMA_BASE_URL',
+			!username && 'WILMA_USERNAME',
+			!password && 'WILMA_PASSWORD'
+		]
+			.filter(Boolean)
+			.join(', ');
+		console.warn('[wilma] not configured; missing env:', missing);
+		return null;
+	}
 	try {
 		return await ensureSession();
 	} catch (err) {

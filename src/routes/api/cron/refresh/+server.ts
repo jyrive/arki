@@ -121,7 +121,15 @@ async function handle(request: Request) {
 	const myclubWindow = { from: addDays(now, -3), to: addDays(now, 14) };
 
 	// ── Wilma (lessons/exams/homework) ─────────────────────────────────
-	const session = await wilmaSession();
+	const wilmaCfg = {
+		baseUrl: env.WILMA_BASE_URL,
+		username: env.WILMA_USERNAME,
+		password: env.WILMA_PASSWORD
+	};
+	const missingWilma = Object.entries(wilmaCfg)
+		.filter(([, v]) => !v)
+		.map(([k]) => k.toUpperCase());
+	const session = missingWilma.length === 0 ? await wilmaSession() : null;
 	if (session) {
 		const roles = wilmaRoles(session);
 		for (const role of roles) {
@@ -173,11 +181,15 @@ async function handle(request: Request) {
 			);
 		}
 	} else {
+		const reason =
+			missingWilma.length > 0
+				? `missing env: WILMA_${missingWilma.join(', WILMA_').replace(/WILMA_WILMA_/g, 'WILMA_')}`
+				: 'login failed (check WILMA_USERNAME/PASSWORD; see Vercel logs)';
 		reports.push({
 			source: 'wilma',
 			kind: 'lesson',
 			success: false,
-			error: 'not configured or session failed',
+			error: reason,
 			durationMs: 0,
 			fetched: 0,
 			inserted: 0,
