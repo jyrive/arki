@@ -14,7 +14,7 @@
     "token:google": "node scripts/get-google-token.mjs",
     "wilma:probe": "node scripts/wilma-probe.mjs",
     "cron:refresh": "node scripts/cron-refresh.mjs",
-    "cron:fetch": "tsx scripts/cron-fetch.ts"
+    "cron:fetch": "node --env-file-if-exists=.env --import tsx scripts/cron-fetch.ts"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
