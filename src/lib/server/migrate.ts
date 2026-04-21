@@ -1,10 +1,5 @@
-import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
 import { getSql } from './db';
-
-const HERE = dirname(fileURLToPath(import.meta.url));
-const SCHEMA_PATH = resolve(HERE, 'schema.sql');
+import schemaSql from './schema.sql?raw';
 
 let migrated = false;
 
@@ -16,7 +11,7 @@ let migrated = false;
 export async function migrate(): Promise<void> {
 	if (migrated) return;
 	const sql = getSql();
-	const ddl = await readFile(SCHEMA_PATH, 'utf8');
+	const ddl = schemaSql;
 	// Neon's HTTP driver can't run multiple statements in one template call,
 	// so split on blank lines / semicolons at the top level.
 	const statements = ddl
