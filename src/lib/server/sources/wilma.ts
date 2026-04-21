@@ -1,5 +1,6 @@
-import { env } from '$env/dynamic/private';
 import type { FamilyEvent, SourceResult } from '$lib/types/event';
+
+const env = process.env;
 
 /**
  * Wilma integration for helsinki.inschool.fi (reverse-engineered from the web UI).

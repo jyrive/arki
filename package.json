@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "token:google": "node scripts/get-google-token.mjs",
     "wilma:probe": "node scripts/wilma-probe.mjs",
-    "cron:refresh": "node scripts/cron-refresh.mjs"
+    "cron:refresh": "node scripts/cron-refresh.mjs",
+    "cron:fetch": "tsx scripts/cron-fetch.ts"
   },
   "devDependencies": {
     "@sveltejs/adapter-node": "^5.5.4",
@@ -24,6 +25,7 @@
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.5.0",
     "vite": "^5.4.0",
     "vitest": "^2.1.0"

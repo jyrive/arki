@@ -1,5 +1,6 @@
 import { neon, neonConfig } from '@neondatabase/serverless';
-import { env } from '$env/dynamic/private';
+
+const env = process.env;
 
 // Use secure fetch in all environments.
 neonConfig.fetchConnectionCache = true;

@@ -1,6 +1,7 @@
-import { env } from '$env/dynamic/private';
 import { GoogleAuth } from 'google-auth-library';
 import type { FamilyEvent, SourceResult } from '$lib/types/event';
+
+const env = process.env;
 
 interface GoogleEventDateTime {
 	dateTime?: string;
