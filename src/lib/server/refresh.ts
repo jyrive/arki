@@ -106,6 +106,13 @@ export async function runRefresh(env: NodeJS.ProcessEnv = process.env): Promise<
 	const session = missingWilma.length === 0 ? await wilmaSession() : null;
 	if (session) {
 		const roles = wilmaRoles(session);
+		// Collect events across all roles per kind, then upsert ONCE per kind.
+		// Per-role upserts would trigger the window-delete step for each role,
+		// deleting the previous role's just-inserted events.
+		const lessonEvents: FamilyEvent[] = [];
+		const examEvents: FamilyEvent[] = [];
+		const homeworkEvents: FamilyEvent[] = [];
+		const roleErrors: string[] = [];
 		for (const role of roles) {
 			let overview: Awaited<ReturnType<typeof fetchWilmaOverviewGroups>> | null = null;
 			try {
@@ -113,43 +120,51 @@ export async function runRefresh(env: NodeJS.ProcessEnv = process.env): Promise<
 			} catch (err) {
 				const msg = err instanceof Error ? err.message : String(err);
 				if (/401|403|session|login/i.test(msg)) invalidateWilmaSession();
-				reports.push({
-					source: 'wilma',
-					kind: 'lesson',
-					success: false,
-					error: `overview: ${msg}`,
-					durationMs: 0,
-					fetched: 0,
-					inserted: 0,
-					updated: 0,
-					unchanged: 0,
-					removed: 0
-				});
+				roleErrors.push(`${role.slug} overview: ${msg}`);
 				continue;
 			}
-			const localOverview = overview;
-			reports.push(
-				await runKind('wilma', 'lesson', lessonWindow, () =>
-					fetchWilmaLessons(session, role, dateOnly(lessonWindow.from), dateOnly(lessonWindow.to))
-				)
-			);
-			reports.push(
-				await runKind('wilma', 'exam', examWindow, () =>
-					fetchWilmaExams(session, role, dateOnly(examWindow.from), dateOnly(examWindow.to))
-				)
-			);
-			reports.push(
-				await runKind('wilma', 'homework', homeworkWindow, () =>
-					fetchWilmaHomework(
+			try {
+				lessonEvents.push(
+					...(await fetchWilmaLessons(
 						session,
 						role,
-						localOverview.groups,
+						dateOnly(lessonWindow.from),
+						dateOnly(lessonWindow.to)
+					))
+				);
+			} catch (err) {
+				roleErrors.push(`${role.slug} lessons: ${err instanceof Error ? err.message : err}`);
+			}
+			try {
+				examEvents.push(
+					...(await fetchWilmaExams(
+						session,
+						role,
+						dateOnly(examWindow.from),
+						dateOnly(examWindow.to)
+					))
+				);
+			} catch (err) {
+				roleErrors.push(`${role.slug} exams: ${err instanceof Error ? err.message : err}`);
+			}
+			try {
+				homeworkEvents.push(
+					...(await fetchWilmaHomework(
+						session,
+						role,
+						overview.groups,
 						dateOnly(homeworkWindow.from),
 						dateOnly(homeworkWindow.to)
-					)
-				)
-			);
+					))
+				);
+			} catch (err) {
+				roleErrors.push(`${role.slug} homework: ${err instanceof Error ? err.message : err}`);
+			}
 		}
+		reports.push(await runKind('wilma', 'lesson', lessonWindow, async () => lessonEvents));
+		reports.push(await runKind('wilma', 'exam', examWindow, async () => examEvents));
+		reports.push(await runKind('wilma', 'homework', homeworkWindow, async () => homeworkEvents));
+		if (roleErrors.length > 0) console.warn('[wilma] role errors:', roleErrors.join('; '));
 	} else {
 		const reason =
 			missingWilma.length > 0
