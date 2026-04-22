@@ -9,33 +9,14 @@
 	}
 	let { homework, heading = 'Läksyt' }: Props = $props();
 
-	let showOlder = $state(false);
+	let expanded = $state(new Set<string>());
 
-	/** The most recent day that has any homework. */
-	const latestDay = $derived.by(() => {
-		if (homework.length === 0) return null;
-		return homework.reduce((max, e) => {
-			const d = e.start.slice(0, 10);
-			return d > max ? d : max;
-		}, homework[0].start.slice(0, 10));
-	});
-
-	/** Up to 5 earlier days, sorted desc, excluding the latest day. */
-	const olderDays = $derived.by(() => {
-		if (!latestDay) return [] as string[];
-		const days = new Set(homework.map((e) => e.start.slice(0, 10)));
-		days.delete(latestDay);
-		return [...days].sort((a, b) => b.localeCompare(a)).slice(0, 5);
-	});
-
-	/** Group homework from the given days by person → date (date desc). */
-	function groupByPerson(days: string[]) {
-		const daySet = new Set(days);
+	/** Group by person → { recent: latest day, older: up to 5 earlier days } */
+	const byPerson = $derived.by(() => {
 		const people = new Map<string, Map<string, FamilyEvent[]>>();
 		for (const e of homework) {
-			const day = e.start.slice(0, 10);
-			if (!daySet.has(day)) continue;
 			const p = e.person ?? 'Wilma';
+			const day = e.start.slice(0, 10);
 			if (!people.has(p)) people.set(p, new Map());
 			const d = people.get(p)!;
 			const list = d.get(day) ?? [];
@@ -44,17 +25,18 @@
 		}
 		return [...people.entries()]
 			.sort(([a], [b]) => a.localeCompare(b))
-			.map(
-				([person, byDay]) =>
-					[
-						person,
-						[...byDay.entries()].sort(([a], [b]) => b.localeCompare(a))
-					] as const
-			);
-	}
+			.map(([person, byDay]) => {
+				const days = [...byDay.entries()].sort(([a], [b]) => b.localeCompare(a));
+				return { person, recent: days.slice(0, 1), older: days.slice(1, 6) };
+			});
+	});
 
-	const recentByPerson = $derived(latestDay ? groupByPerson([latestDay]) : []);
-	const olderByPerson = $derived(olderDays.length > 0 ? groupByPerson(olderDays) : []);
+	function toggle(person: string) {
+		const next = new Set(expanded);
+		if (next.has(person)) next.delete(person);
+		else next.add(person);
+		expanded = next;
+	}
 
 	/** Strip the `Läksy · <subject> · ` prefix for display. */
 	function trim(title: string): { subject: string; text: string } {
@@ -72,13 +54,12 @@
 			<h3 class="text-title-md text-on-surface font-medium">📘 {heading}</h3>
 			<span class="text-label-md text-on-surface-variant">{homework.length}</span>
 		</header>
-
-		<!-- Most recent day -->
-		<div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr))">
-			{#each recentByPerson as [person, days] (person)}
+		<div class="grid items-start gap-3" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr))">
+			{#each byPerson as { person, recent, older } (person)}
 				<Card variant="outlined" class="space-y-3 border-secondary/40">
 					<p class="text-label-lg text-secondary font-medium">{person}</p>
-					{#each days as [day, items] (day)}
+
+					{#each recent as [day, items] (day)}
 						<div class="space-y-1">
 							<p class="text-label-md text-on-surface-variant uppercase tracking-wide">
 								{formatDayHeading(day)}
@@ -94,57 +75,47 @@
 							{/each}
 						</div>
 					{/each}
+
+					{#if older.length > 0}
+						<button
+							onclick={() => toggle(person)}
+							aria-label={expanded.has(person) ? 'Piilota aiemmat' : 'Näytä aiemmat'}
+							class="text-secondary/50 hover:text-secondary -mx-1 flex w-full cursor-pointer justify-center py-1 transition-colors"
+						>
+							<svg
+								class="size-8 transition-transform duration-200"
+								class:rotate-180={expanded.has(person)}
+								viewBox="0 0 24 24"
+								fill="currentColor"
+								aria-hidden="true"
+							>
+								<path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
+							</svg>
+						</button>
+
+						{#if expanded.has(person)}
+							<div class="border-outline/20 space-y-3 border-t pt-2">
+								{#each older as [day, items] (day)}
+									<div class="space-y-1">
+										<p class="text-label-md text-on-surface-variant/60 uppercase tracking-wide">
+											{formatDayHeading(day)}
+										</p>
+										{#each items as e (e.id)}
+											{@const parsed = trim(e.title)}
+											<p class="text-body-sm text-on-surface/60">
+												{#if parsed.subject}
+													<span class="text-on-surface-variant/60">{parsed.subject}:</span>
+												{/if}
+												{parsed.text}
+											</p>
+										{/each}
+									</div>
+								{/each}
+							</div>
+						{/if}
+					{/if}
 				</Card>
 			{/each}
 		</div>
-
-		<!-- Toggle for older days -->
-		{#if olderDays.length > 0}
-			<button
-				onclick={() => (showOlder = !showOlder)}
-				class="text-label-md text-secondary hover:text-secondary/70 flex cursor-pointer items-center gap-1 px-1 transition-colors"
-			>
-				<svg
-					class="size-4 transition-transform duration-200"
-					class:rotate-180={showOlder}
-					viewBox="0 0 20 20"
-					fill="currentColor"
-					aria-hidden="true"
-				>
-					<path
-						fill-rule="evenodd"
-						d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-						clip-rule="evenodd"
-					/>
-				</svg>
-				{showOlder ? 'Piilota aiemmat' : 'Näytä aiemmat'}
-			</button>
-
-			{#if showOlder}
-				<div class="grid gap-3" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr))">
-					{#each olderByPerson as [person, days] (person)}
-						<Card variant="outlined" class="space-y-3 border-secondary/20">
-							<p class="text-label-lg text-secondary/70 font-medium">{person}</p>
-							{#each days as [day, items] (day)}
-								<div class="space-y-1">
-									<p class="text-label-md text-on-surface-variant uppercase tracking-wide">
-										{formatDayHeading(day)}
-									</p>
-									{#each items as e (e.id)}
-										{@const parsed = trim(e.title)}
-										<p class="text-body-sm text-on-surface/70">
-											{#if parsed.subject}
-												<span class="text-on-surface-variant/70">{parsed.subject}:</span>
-											{/if}
-											{parsed.text}
-										</p>
-									{/each}
-								</div>
-							{/each}
-						</Card>
-					{/each}
-				</div>
-			{/if}
-		{/if}
 	</section>
 {/if}

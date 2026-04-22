@@ -9,9 +9,9 @@
 
 	let { variant = 'filled', class: klass = '', children, ...rest }: Props = $props();
 
-	const base = 'rounded-lg p-4 transition-shadow';
+	const base = 'rounded-md p-4 transition-shadow';
 	const variants: Record<NonNullable<Props['variant']>, string> = {
-		elevated: 'bg-surface-container-low text-on-surface shadow-sm hover:shadow-md',
+		elevated: 'bg-surface-container-low text-on-surface shadow-sm hover:shadow',
 		filled: 'bg-surface-container-highest text-on-surface',
 		outlined: 'bg-surface text-on-surface border border-outline-variant'
 	};
