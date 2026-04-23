@@ -37,7 +37,7 @@
 						<p class="text-label-md text-on-surface-variant tabular-nums">
 							{formatTime(e.start, false)} – {formatTime(e.end, false)}
 						</p>
-						<p class="text-body-md truncate font-medium">{e.title}</p>
+						<p class="text-body-md font-medium leading-snug">{e.title}</p>
 						{#if e.location}
 							<p class="text-body-sm text-on-surface-variant flex items-center gap-1 truncate">
 								<Icon name="location_on" size={14} />

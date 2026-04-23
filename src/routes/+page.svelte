@@ -29,7 +29,7 @@
 		{/if}
 	{/each}
 
-	<div class="grid items-start gap-4 md:grid-cols-[2fr_1fr_1fr]">
+	<div class="grid items-start gap-4 md:grid-cols-[3fr_4fr_4fr]">
 		<!-- Column 1: Today's events -->
 		<div class="space-y-3">
 			<div class="px-1">
