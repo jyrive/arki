@@ -25,6 +25,10 @@
 	function cleanTitle(title: string): string {
 		return title.replace(/^Koe:\s*/, '');
 	}
+
+	function firstName(person: string | undefined): string {
+		return person?.split(' ')[0] ?? '';
+	}
 </script>
 
 {#if exams.length > 0}
@@ -46,7 +50,7 @@
 						<div class="flex items-baseline justify-between gap-3">
 							<p class="text-body-md text-on-surface min-w-0 truncate">{cleanTitle(e.title)}</p>
 							{#if e.person}
-								<span class="text-label-md text-on-surface-variant shrink-0">{e.person}</span>
+								<span class="text-label-md text-on-surface-variant shrink-0">{firstName(e.person)}</span>
 							{/if}
 						</div>
 					{/each}
