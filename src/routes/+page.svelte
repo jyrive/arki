@@ -30,7 +30,7 @@
 	{/each}
 
 	<div class="grid items-start gap-4 md:grid-cols-[2fr_1fr_1fr]">
-		<!-- Calendar (other events) -->
+		<!-- Column 1: Today's events -->
 		<div class="space-y-3">
 			<div class="px-1">
 				<h2 class="text-title-lg text-on-surface font-medium capitalize">{today}</h2>
@@ -51,17 +51,15 @@
 			{/if}
 		</div>
 
-		<!-- Homework -->
+		<!-- Column 2: Messages -->
 		<div>
-			<HomeworkPanel homework={data.recentHomework} heading="Viimeisimmät läksyt" />
+			<MessagesPanel messages={data.recentMessages} heading="Viimeisimmät viestit" />
 		</div>
 
-		<!-- Exams -->
-		<div>
+		<!-- Column 3: Homework + Exams -->
+		<div class="space-y-4">
+			<HomeworkPanel homework={data.recentHomework} heading="Viimeisimmät läksyt" />
 			<ExamsPanel exams={data.upcomingExams} heading="Tulevat kokeet" />
 		</div>
 	</div>
-
-	<!-- Messages -->
-	<MessagesPanel messages={data.recentMessages} heading="Viimeisimmät viestit" />
 </section>
