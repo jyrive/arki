@@ -8,9 +8,16 @@
 	import { isLesson } from '$lib/utils/classify';
 	import type { PageData } from './$types';
 
+	import { onMount } from 'svelte';
+
 	let { data }: { data: PageData } = $props();
 
 	const otherEvents = $derived(data.events.filter((e) => !isLesson(e)));
+
+	onMount(() => {
+		const timer = setInterval(() => location.reload(), 15 * 60 * 1000);
+		return () => clearInterval(timer);
+	});
 
 	const today = new Date().toLocaleDateString(undefined, {
 		weekday: 'long',

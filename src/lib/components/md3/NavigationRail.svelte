@@ -40,4 +40,17 @@
 			</span>
 		</a>
 	{/each}
+
+	<form method="POST" action="/logout" class="mt-auto flex w-full flex-col items-center">
+		<button
+			type="submit"
+			class="group flex w-full flex-col items-center gap-1"
+			title="Sign out"
+		>
+			<span class="text-on-surface-variant flex h-8 w-14 items-center justify-center rounded-full transition-colors group-hover:bg-error/10 group-hover:text-error">
+				<Icon name="logout" size={24} />
+			</span>
+			<span class="text-label-md text-on-surface-variant font-medium">Sign out</span>
+		</button>
+	</form>
 </nav>
