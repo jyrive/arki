@@ -2,6 +2,7 @@
 	import type { FamilyEvent } from '$lib/types/event';
 	import Card from '$lib/components/md3/Card.svelte';
 	import Icon from '$lib/components/md3/Icon.svelte';
+	import MessageDrawer from '$lib/components/MessageDrawer.svelte';
 	import { formatDayHeading } from '$lib/utils/date';
 
 	interface Props {
@@ -33,14 +34,7 @@
 	const older = $derived(sorted.filter((e) => !recentIds.has(e.id)).slice(0, 5));
 
 	let expanded = $state(false);
-
-	let openMessage = $state(new Set<string>());
-	function toggleMessage(id: string) {
-		const next = new Set(openMessage);
-		if (next.has(id)) next.delete(id);
-		else next.add(id);
-		openMessage = next;
-	}
+	let activeMessage = $state<FamilyEvent | null>(null);
 
 	function getRaw(e: FamilyEvent): MessageRaw {
 		return (e.raw as MessageRaw) ?? {};
@@ -62,6 +56,8 @@
 	}
 </script>
 
+<MessageDrawer message={activeMessage} onclose={() => (activeMessage = null)} />
+
 {#if messages.length > 0}
 	<section class="space-y-2">
 		<header class="flex items-baseline justify-between px-1">
@@ -76,29 +72,27 @@
 			{#each recent as e (e.id)}
 				{@const raw = getRaw(e)}
 				{@const day = e.start.slice(0, 10)}
-				{@const isOpen = openMessage.has(e.id)}
-				<div class="space-y-1">
-					<p class="text-label-md text-on-surface-variant uppercase tracking-wide">
-						{formatDayHeading(day)} · {formatTime(e.start)}
-					</p>
-					<p class="text-body-sm text-on-surface flex gap-2">
-						<span class="text-secondary shrink-0 font-medium">{firstName(e.person)}</span>
-						<span class="font-medium">{raw.subject ?? e.title}</span>
-					</p>
-					{#if raw.sender}
-						<p class="text-label-sm text-on-surface-variant pl-[calc(theme(spacing.2)+1ch)]">{raw.sender}</p>
-					{/if}
-					{#if raw.contentText}
-						<button
-							type="button"
-							onclick={() => toggleMessage(e.id)}
-							class="text-body-sm text-on-surface/80 hover:text-on-surface w-full cursor-pointer text-left whitespace-pre-line"
-							aria-expanded={isOpen}
-						>
-							{isOpen ? raw.contentText : excerpt(raw.contentText)}
-						</button>
-					{/if}
-				</div>
+				<button
+					type="button"
+					onclick={() => (activeMessage = e)}
+					class="hover:bg-surface-container -mx-1 w-[calc(100%+0.5rem)] cursor-pointer rounded-lg px-1 py-1 text-left transition-colors"
+				>
+					<div class="space-y-1">
+						<p class="text-label-md text-on-surface-variant uppercase tracking-wide">
+							{formatDayHeading(day)} · {formatTime(e.start)}
+						</p>
+						<p class="text-body-sm text-on-surface flex gap-2">
+							<span class="text-secondary shrink-0 font-medium">{firstName(e.person)}</span>
+							<span class="font-medium">{raw.subject ?? e.title}</span>
+						</p>
+						{#if raw.sender}
+							<p class="text-label-sm text-on-surface-variant pl-[calc(--spacing(2)+1ch)]">{raw.sender}</p>
+						{/if}
+						{#if raw.contentText}
+							<p class="text-body-sm text-on-surface/70 line-clamp-2">{excerpt(raw.contentText)}</p>
+						{/if}
+					</div>
+				</button>
 			{/each}
 
 			{#if older.length > 0}
@@ -119,29 +113,27 @@
 						{#each older as e (e.id)}
 							{@const raw = getRaw(e)}
 							{@const day = e.start.slice(0, 10)}
-							{@const isOpen = openMessage.has(e.id)}
-							<div class="space-y-1">
-								<p class="text-label-md text-on-surface-variant/60 uppercase tracking-wide">
-									{formatDayHeading(day)} · {formatTime(e.start)}
-								</p>
-								<p class="text-body-sm text-on-surface/80 flex gap-2">
-									<span class="text-secondary/60 shrink-0 font-medium">{firstName(e.person)}</span>
-									<span class="font-medium">{raw.subject ?? e.title}</span>
-								</p>
-								{#if raw.sender}
-									<p class="text-label-sm text-on-surface-variant/60">{raw.sender}</p>
-								{/if}
-								{#if raw.contentText}
-									<button
-										type="button"
-										onclick={() => toggleMessage(e.id)}
-										class="text-body-sm text-on-surface/60 hover:text-on-surface w-full cursor-pointer text-left whitespace-pre-line"
-										aria-expanded={isOpen}
-									>
-										{isOpen ? raw.contentText : excerpt(raw.contentText)}
-									</button>
-								{/if}
-							</div>
+							<button
+								type="button"
+								onclick={() => (activeMessage = e)}
+								class="hover:bg-surface-container -mx-1 w-[calc(100%+0.5rem)] cursor-pointer rounded-lg px-1 py-1 text-left transition-colors"
+							>
+								<div class="space-y-1">
+									<p class="text-label-md text-on-surface-variant/60 uppercase tracking-wide">
+										{formatDayHeading(day)} · {formatTime(e.start)}
+									</p>
+									<p class="text-body-sm text-on-surface/80 flex gap-2">
+										<span class="text-secondary/60 shrink-0 font-medium">{firstName(e.person)}</span>
+										<span class="font-medium">{raw.subject ?? e.title}</span>
+									</p>
+									{#if raw.sender}
+										<p class="text-label-sm text-on-surface-variant/60">{raw.sender}</p>
+									{/if}
+									{#if raw.contentText}
+										<p class="text-body-sm text-on-surface/50 line-clamp-2">{excerpt(raw.contentText)}</p>
+									{/if}
+								</div>
+							</button>
 						{/each}
 					</div>
 				{/if}
@@ -149,3 +141,4 @@
 		</Card>
 	</section>
 {/if}
+

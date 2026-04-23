@@ -3,11 +3,7 @@
 	import NavigationBar from '$lib/components/md3/NavigationBar.svelte';
 	import NavigationRail from '$lib/components/md3/NavigationRail.svelte';
 
-	const navItems = [
-		{ href: '/', label: 'Today', icon: 'today' },
-		{ href: '/school', label: 'School', icon: 'school' },
-		{ href: '/week', label: 'Week', icon: 'calendar_month' }
-	];
+	const navItems = [{ href: '/', label: 'Today', icon: 'today' }];
 
 	let { children } = $props();
 </script>
