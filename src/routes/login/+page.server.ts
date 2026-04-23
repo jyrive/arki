@@ -1,6 +1,5 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { createHash } from 'crypto';
-import { dev } from '$app/environment';
 import { env } from '$env/dynamic/private';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -32,11 +31,11 @@ export const actions: Actions = {
 			return fail(403, { error: 'Wrong password.' });
 		}
 
-		cookies.set(COOKIE, token(), {
+		cookies.set(COOKIE, token() as string, {
 			path: '/',
 			httpOnly: true,
-			secure: !dev,
-			sameSite: 'strict',
+			secure: false,
+			sameSite: 'lax',
 			maxAge: TEN_YEARS
 		});
 
