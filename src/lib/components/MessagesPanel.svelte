@@ -18,10 +18,19 @@
 		timestamp?: string;
 	}
 
-	/** All messages sorted newest first. Show 1 recent + up to 5 older on expand. */
+	/** All messages sorted newest first. Show latest per child in recent, up to 5 others on expand. */
 	const sorted = $derived([...messages].sort((a, b) => b.start.localeCompare(a.start)));
-	const recent = $derived(sorted.slice(0, 1));
-	const older = $derived(sorted.slice(1, 6));
+	const recent = $derived.by(() => {
+		const seen = new Set<string>();
+		return sorted.filter((e) => {
+			const p = e.person ?? '';
+			if (seen.has(p)) return false;
+			seen.add(p);
+			return true;
+		});
+	});
+	const recentIds = $derived(new Set(recent.map((e) => e.id)));
+	const older = $derived(sorted.filter((e) => !recentIds.has(e.id)).slice(0, 5));
 
 	let expanded = $state(false);
 
