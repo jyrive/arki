@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import Icon from './Icon.svelte';
 
 	interface Item {
 		href: string;
@@ -26,11 +27,11 @@
 			aria-current={active ? 'page' : undefined}
 		>
 			<span
-				class={`flex h-8 w-16 items-center justify-center rounded-full text-xl transition-colors ${
+				class={`flex h-8 w-16 items-center justify-center rounded-full transition-colors ${
 					active ? 'bg-secondary-container text-on-secondary-container' : 'text-on-surface-variant'
 				}`}
 			>
-				{item.icon}
+				<Icon name={item.icon} size={24} filled={active} />
 			</span>
 			<span
 				class={`text-label-md ${active ? 'text-on-surface' : 'text-on-surface-variant'} font-medium`}

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FamilyEvent } from '$lib/types/event';
 	import { formatTime } from '$lib/utils/date';
+	import Icon from '$lib/components/md3/Icon.svelte';
 
 	interface Props {
 		/** Lesson-style events (timed, source=wilma). */
@@ -38,7 +39,10 @@
 						</p>
 						<p class="text-body-md truncate font-medium">{e.title}</p>
 						{#if e.location}
-							<p class="text-body-sm text-on-surface-variant truncate">📍 {e.location}</p>
+							<p class="text-body-sm text-on-surface-variant flex items-center gap-1 truncate">
+								<Icon name="location_on" size={14} />
+								<span class="truncate">{e.location}</span>
+							</p>
 						{/if}
 					</div>
 				{/each}

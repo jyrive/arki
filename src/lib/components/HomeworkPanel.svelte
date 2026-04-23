@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FamilyEvent } from '$lib/types/event';
 	import Card from '$lib/components/md3/Card.svelte';
+	import Icon from '$lib/components/md3/Icon.svelte';
 	import { formatDayHeading } from '$lib/utils/date';
 
 	interface Props {
@@ -51,7 +52,10 @@
 {#if homework.length > 0}
 	<section class="space-y-2">
 		<header class="flex items-baseline justify-between px-1">
-			<h3 class="text-title-md text-on-surface font-medium">📘 {heading}</h3>
+			<h3 class="text-title-md text-on-surface flex items-center gap-2 font-medium">
+				<Icon name="menu_book" size={20} />
+				{heading}
+			</h3>
 			<span class="text-label-md text-on-surface-variant">{homework.length}</span>
 		</header>
 		<div class="grid items-start gap-3" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr))">
@@ -82,15 +86,11 @@
 							aria-label={expanded.has(person) ? 'Piilota aiemmat' : 'Näytä aiemmat'}
 							class="text-secondary/50 hover:text-secondary -mx-1 flex w-full cursor-pointer justify-center py-1 transition-colors"
 						>
-							<svg
-								class="size-8 transition-transform duration-200"
-								class:rotate-180={expanded.has(person)}
-								viewBox="0 0 24 24"
-								fill="currentColor"
-								aria-hidden="true"
-							>
-								<path d="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
-							</svg>
+							<Icon
+								name="expand_more"
+								size={32}
+								class={`transition-transform duration-200 ${expanded.has(person) ? 'rotate-180' : ''}`}
+							/>
 						</button>
 
 						{#if expanded.has(person)}

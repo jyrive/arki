@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { FamilyEvent } from '$lib/types/event';
 	import Card from '$lib/components/md3/Card.svelte';
+	import Icon from '$lib/components/md3/Icon.svelte';
 	import { formatDayHeading } from '$lib/utils/date';
 
 	interface Props {
@@ -29,7 +30,10 @@
 {#if exams.length > 0}
 	<section class="space-y-2">
 		<header class="flex items-baseline justify-between px-1">
-			<h3 class="text-title-md text-on-surface font-medium">📝 {heading}</h3>
+			<h3 class="text-title-md text-on-surface flex items-center gap-2 font-medium">
+				<Icon name="quiz" size={20} />
+				{heading}
+			</h3>
 			<span class="text-label-md text-on-surface-variant">{exams.length}</span>
 		</header>
 		<Card variant="outlined" class="space-y-3 border-tertiary/40">

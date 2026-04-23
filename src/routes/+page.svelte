@@ -3,14 +3,12 @@
 	import ExamsPanel from '$lib/components/ExamsPanel.svelte';
 	import FreshnessNotice from '$lib/components/FreshnessNotice.svelte';
 	import HomeworkPanel from '$lib/components/HomeworkPanel.svelte';
-	import SchoolDayColumns from '$lib/components/SchoolDayColumns.svelte';
 	import Card from '$lib/components/md3/Card.svelte';
 	import { isLesson } from '$lib/utils/classify';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
-	const lessons = $derived(data.events.filter(isLesson));
 	const otherEvents = $derived(data.events.filter((e) => !isLesson(e)));
 
 	const today = new Date().toLocaleDateString(undefined, {
@@ -41,19 +39,15 @@
 
 	<HomeworkPanel homework={data.recentHomework} heading="Viimeisimmät läksyt" />
 
-	{#if data.events.length === 0}
+	{#if otherEvents.length === 0}
 		<Card variant="outlined">
 			<p class="text-on-surface-variant text-body-md">Nothing scheduled today. Enjoy the calm. 🌿</p>
 		</Card>
 	{:else}
-		<SchoolDayColumns events={lessons} />
-
-		{#if otherEvents.length > 0}
-			<div class="space-y-3">
-				{#each otherEvents as event (event.id)}
-					<EventCard {event} />
-				{/each}
-			</div>
-		{/if}
+		<div class="space-y-3">
+			{#each otherEvents as event (event.id)}
+				<EventCard {event} />
+			{/each}
+		</div>
 	{/if}
 </section>

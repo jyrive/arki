@@ -2,6 +2,7 @@
 	import type { FamilyEvent } from '$lib/types/event';
 	import { formatTime } from '$lib/utils/date';
 	import Card from '$lib/components/md3/Card.svelte';
+	import Icon from '$lib/components/md3/Icon.svelte';
 
 	interface Props {
 		event: FamilyEvent;
@@ -28,7 +29,10 @@
 			</span>
 		</div>
 		{#if event.location}
-			<p class="text-body-sm text-on-surface-variant truncate">📍 {event.location}</p>
+			<p class="text-body-sm text-on-surface-variant flex items-center gap-1 truncate">
+				<Icon name="location_on" size={16} />
+				<span class="truncate">{event.location}</span>
+			</p>
 		{/if}
 	</div>
 </Card>

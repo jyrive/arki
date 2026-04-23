@@ -5,8 +5,9 @@
 	import AppBar from '$lib/components/md3/AppBar.svelte';
 
 	const navItems = [
-		{ href: '/', label: 'Today', icon: '☀️' },
-		{ href: '/week', label: 'Week', icon: '🗓️' }
+		{ href: '/', label: 'Today', icon: 'today' },
+		{ href: '/school', label: 'School', icon: 'school' },
+		{ href: '/week', label: 'Week', icon: 'calendar_month' }
 	];
 
 	let { children } = $props();
