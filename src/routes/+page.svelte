@@ -3,6 +3,7 @@
 	import ExamsPanel from '$lib/components/ExamsPanel.svelte';
 	import FreshnessNotice from '$lib/components/FreshnessNotice.svelte';
 	import HomeworkPanel from '$lib/components/HomeworkPanel.svelte';
+	import MessagesPanel from '$lib/components/MessagesPanel.svelte';
 	import Card from '$lib/components/md3/Card.svelte';
 	import { isLesson } from '$lib/utils/classify';
 	import type { PageData } from './$types';
@@ -60,4 +61,7 @@
 			<ExamsPanel exams={data.upcomingExams} heading="Tulevat kokeet" />
 		</div>
 	</div>
+
+	<!-- Messages -->
+	<MessagesPanel messages={data.recentMessages} heading="Viimeisimmät viestit" />
 </section>
