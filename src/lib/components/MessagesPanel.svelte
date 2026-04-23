@@ -140,5 +140,3 @@
 		</Card>
 	</section>
 {/if}
-
-{/if}
