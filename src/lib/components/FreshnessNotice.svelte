@@ -1,6 +1,4 @@
 <script lang="ts">
-	import Card from '$lib/components/md3/Card.svelte';
-
 	interface Props {
 		stalestSuccess?: string | null;
 		fromDb?: boolean;
@@ -26,12 +24,9 @@
 </script>
 
 {#if isStale}
-	<Card variant="outlined" class="border-tertiary/40">
-		<p class="text-label-lg text-on-surface font-medium">Tiedot voivat olla vanhoja</p>
-		<p class="text-body-sm text-on-surface-variant">Viimeisin onnistunut päivitys {label}.</p>
-	</Card>
-{/if}
-
-{#if label}
-	<p class="text-label-sm text-on-surface-variant px-1 text-right">Päivitetty {label}</p>
+	<p class="text-label-sm text-tertiary">
+		⚠️ Tiedot voivat olla vanhoja — viimeisin päivitys {label}
+	</p>
+{:else if label}
+	<p class="text-label-sm text-on-surface-variant/70">Päivitetty {label}</p>
 {/if}
