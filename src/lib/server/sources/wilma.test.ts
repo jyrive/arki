@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { expandSchedule, parseFinnishDate, parseExamsHtml, parseHomeworkHtml } from './wilma';
+import {
+	expandSchedule,
+	parseFinnishDate,
+	parseExamsHtml,
+	parseHomeworkHtml,
+	parseWilmaTimestamp,
+	htmlToText
+} from './wilma';
 
 describe('parseFinnishDate', () => {
 	it('parses weekday-prefixed dot format', () => {
@@ -122,5 +129,33 @@ describe('parseHomeworkHtml', () => {
 
 	it('returns empty list when heading missing', () => {
 		expect(parseHomeworkHtml('<p>nothing here</p>')).toEqual([]);
+	});
+});
+
+describe('parseWilmaTimestamp', () => {
+	it('parses "YYYY-MM-DD HH:MM"', () => {
+		expect(parseWilmaTimestamp('2026-04-17 11:51')).toBe('2026-04-17T11:51:00');
+	});
+	it('parses with seconds', () => {
+		expect(parseWilmaTimestamp('2026-04-17 09:05:22')).toBe('2026-04-17T09:05:22');
+	});
+	it('pads single-digit hour', () => {
+		expect(parseWilmaTimestamp('2026-04-17 9:05')).toBe('2026-04-17T09:05:00');
+	});
+	it('returns null for junk', () => {
+		expect(parseWilmaTimestamp('not a date')).toBeNull();
+	});
+});
+
+describe('htmlToText', () => {
+	it('converts <br> and </p> to line breaks', () => {
+		expect(htmlToText('<p>Hei!</p><p>Toinen<br>rivi</p>')).toBe('Hei!\n\nToinen\nrivi');
+	});
+	it('decodes common entities', () => {
+		expect(htmlToText('j&auml;lleen &amp; taas')).toBe('jälleen & taas');
+		expect(htmlToText('&#228;&#246;')).toBe('äö');
+	});
+	it('strips remaining tags and trims whitespace', () => {
+		expect(htmlToText('<div>  <span>foo</span>   bar  </div>')).toBe('foo   bar');
 	});
 });

@@ -10,7 +10,12 @@ export function isHomework(e: FamilyEvent): boolean {
 	return e.source === 'wilma' && e.allDay && e.title.startsWith('Läksy');
 }
 
+/** A Wilma inbox message ("Viesti · …"). */
+export function isMessage(e: FamilyEvent): boolean {
+	return e.source === 'wilma' && e.title.startsWith('Viesti');
+}
+
 /** A timed Wilma lesson — belongs in the per-child school-day columns. */
 export function isLesson(e: FamilyEvent): boolean {
-	return e.source === 'wilma' && !e.allDay;
+	return e.source === 'wilma' && !e.allDay && !isMessage(e);
 }

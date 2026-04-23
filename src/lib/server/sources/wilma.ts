@@ -437,6 +437,129 @@ async function fetchHomeworkForRole(
 	return batches.flat();
 }
 
+// ── Messages (JSON /!<slug>/messages/list + per-id body) ───────────────────
+
+interface WilmaMessageSummary {
+	Id: number;
+	Subject?: string;
+	TimeStamp?: string; // "2026-04-17 11:51"
+	Folder?: string;
+	SenderId?: number;
+	SenderType?: number;
+	Sender?: string;
+	Status?: number;
+}
+
+interface WilmaMessageDetail extends WilmaMessageSummary {
+	ContentHtml?: string;
+}
+
+/**
+ * Parses Wilma's "YYYY-MM-DD HH:MM" timestamps into a naive ISO string
+ * (no timezone designator, matching the convention used by expandSchedule).
+ */
+export function parseWilmaTimestamp(ts: string): string | null {
+	const m = ts.trim().match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+	if (!m) return null;
+	const [, y, mo, d, h, mi, se] = m;
+	return `${y}-${mo}-${d}T${h.padStart(2, '0')}:${mi}:${(se ?? '00').padStart(2, '0')}`;
+}
+
+/** Strips HTML and collapses whitespace — good enough for search/excerpts. */
+export function htmlToText(html: string): string {
+	return html
+		.replace(/<br\s*\/?>/gi, '\n')
+		.replace(/<\/p>/gi, '\n\n')
+		.replace(/<[^>]+>/g, '')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&quot;/g, '"')
+		.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+		.replace(/&auml;/g, 'ä')
+		.replace(/&ouml;/g, 'ö')
+		.replace(/&aring;/g, 'å')
+		.replace(/&Auml;/g, 'Ä')
+		.replace(/&Ouml;/g, 'Ö')
+		.replace(/&Aring;/g, 'Å')
+		.replace(/\r/g, '')
+		.replace(/[ \t]+\n/g, '\n')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
+}
+
+async function fetchMessageBody(
+	baseUrl: string,
+	cookie: string,
+	role: Role,
+	id: number
+): Promise<WilmaMessageDetail | null> {
+	try {
+		const res = await wilmaFetch(baseUrl, `/!${role.slug}/messages/${id}?format=json`, cookie);
+		if (!res.ok) return null;
+		const data = (await res.json()) as { messages?: WilmaMessageDetail[] };
+		return data.messages?.[0] ?? null;
+	} catch {
+		return null;
+	}
+}
+
+async function fetchMessagesForRole(
+	baseUrl: string,
+	cookie: string,
+	role: Role,
+	fromDate: string,
+	toDate: string
+): Promise<FamilyEvent[]> {
+	const res = await wilmaFetch(baseUrl, `/!${role.slug}/messages/list`, cookie);
+	if (!res.ok) return [];
+	let data: { Messages?: WilmaMessageSummary[] };
+	try {
+		data = (await res.json()) as { Messages?: WilmaMessageSummary[] };
+	} catch {
+		return [];
+	}
+	const messages = (data.Messages ?? []).filter((m) => {
+		const day = m.TimeStamp?.slice(0, 10);
+		return !!day && day >= fromDate && day <= toDate;
+	});
+	const detailed = await mapLimit(messages, 4, async (m) => {
+		const body = await fetchMessageBody(baseUrl, cookie, role, m.Id);
+		return { summary: m, detail: body };
+	});
+	const out: FamilyEvent[] = [];
+	for (const { summary, detail } of detailed) {
+		const start = parseWilmaTimestamp(summary.TimeStamp ?? '');
+		if (!start) continue;
+		const sender = summary.Sender ?? 'Wilma';
+		const subject = summary.Subject ?? '(ei aihetta)';
+		const bodyText = detail?.ContentHtml ? htmlToText(detail.ContentHtml) : undefined;
+		out.push({
+			id: `wilma:msg:${role.slug}:${summary.Id}`,
+			source: 'wilma',
+			title: `Viesti · ${sender} · ${subject}`.slice(0, 200),
+			start,
+			end: start,
+			allDay: false,
+			person: role.name,
+			raw: {
+				id: summary.Id,
+				folder: summary.Folder,
+				sender,
+				senderId: summary.SenderId,
+				subject,
+				timestamp: summary.TimeStamp,
+				status: summary.Status,
+				href: `/!${role.slug}/messages/${summary.Id}`,
+				contentHtml: detail?.ContentHtml,
+				contentText: bodyText
+			}
+		});
+	}
+	return out;
+}
+
 // ── Aggregator ─────────────────────────────────────────────────────────────
 
 /**
@@ -515,6 +638,16 @@ export async function fetchWilmaHomework(
 	return fetchHomeworkForRole(s.baseUrl, s.cookie, role, groups, fromDate, toDate);
 }
 
+/** Fetch inbox messages (with bodies) for a single role. */
+export async function fetchWilmaMessages(
+	s: Session,
+	role: Role,
+	fromDate: string,
+	toDate: string
+): Promise<FamilyEvent[]> {
+	return fetchMessagesForRole(s.baseUrl, s.cookie, role, fromDate, toDate);
+}
+
 /** Fetch a role's overview once; cron reuses it for lessons + groups. */
 export async function fetchWilmaOverviewGroups(
 	s: Session,
@@ -545,19 +678,27 @@ export async function fetchWilmaEvents(from: Date, to: Date): Promise<SourceResu
 		const hwFrom = fromDate < hwFromDate ? fromDate : hwFromDate;
 		const hwTo = toDate > hwFromDate ? toDate : today.toISOString().slice(0, 10);
 
+		// Messages: last 30 days regardless of caller window.
+		const msgFrom = new Date(today.getTime() - 30 * 864e5).toISOString().slice(0, 10);
+		const msgTo = today.toISOString().slice(0, 10);
+
 		const batches = await Promise.all(
 			s.roles.map(async (r) => {
 				try {
 					const { slots, groups } = await fetchOverview(s.baseUrl, s.cookie, r);
 					const lessons = expandSchedule(slots, r, fromDate, toDate);
-					const [exams, homework] = await Promise.all([
+					const [exams, homework, messages] = await Promise.all([
 						fetchExamsForRole(s.baseUrl, s.cookie, r, fromDate, toDate).catch((e) => {
 							console.warn(`[wilma] exams fetch failed for ${r.slug}:`, e);
 							return [] as FamilyEvent[];
 						}),
-						fetchHomeworkForRole(s.baseUrl, s.cookie, r, groups, hwFrom, hwTo)
+						fetchHomeworkForRole(s.baseUrl, s.cookie, r, groups, hwFrom, hwTo),
+						fetchMessagesForRole(s.baseUrl, s.cookie, r, msgFrom, msgTo).catch((e) => {
+							console.warn(`[wilma] messages fetch failed for ${r.slug}:`, e);
+							return [] as FamilyEvent[];
+						})
 					]);
-					return [...lessons, ...exams, ...homework];
+					return [...lessons, ...exams, ...homework, ...messages];
 				} catch (e) {
 					console.warn(`[wilma] role ${r.slug} failed:`, e);
 					return [] as FamilyEvent[];

@@ -15,6 +15,7 @@ import {
 	fetchWilmaLessons,
 	fetchWilmaExams,
 	fetchWilmaHomework,
+	fetchWilmaMessages,
 	invalidateWilmaSession
 } from './sources/wilma';
 import { fetchGoogleEvents } from './sources/google';
@@ -94,6 +95,7 @@ export async function runRefresh(env: NodeJS.ProcessEnv = process.env): Promise<
 	const lessonWindow = { from: addDays(now, -3), to: addDays(now, 7) };
 	const examWindow = { from: now, to: addDays(now, 21) };
 	const homeworkWindow = { from: addDays(now, -7), to: addDays(now, 1) };
+	const messageWindow = { from: addDays(now, -30), to: addDays(now, 1) };
 	const calendarWindow = { from: addDays(now, -3), to: addDays(now, 14) };
 	const myclubWindow = { from: addDays(now, -3), to: addDays(now, 14) };
 
@@ -112,6 +114,7 @@ export async function runRefresh(env: NodeJS.ProcessEnv = process.env): Promise<
 		const lessonEvents: FamilyEvent[] = [];
 		const examEvents: FamilyEvent[] = [];
 		const homeworkEvents: FamilyEvent[] = [];
+		const messageEvents: FamilyEvent[] = [];
 		const roleErrors: string[] = [];
 		for (const role of roles) {
 			let overview: Awaited<ReturnType<typeof fetchWilmaOverviewGroups>> | null = null;
@@ -160,10 +163,23 @@ export async function runRefresh(env: NodeJS.ProcessEnv = process.env): Promise<
 			} catch (err) {
 				roleErrors.push(`${role.slug} homework: ${err instanceof Error ? err.message : err}`);
 			}
+			try {
+				messageEvents.push(
+					...(await fetchWilmaMessages(
+						session,
+						role,
+						dateOnly(messageWindow.from),
+						dateOnly(messageWindow.to)
+					))
+				);
+			} catch (err) {
+				roleErrors.push(`${role.slug} messages: ${err instanceof Error ? err.message : err}`);
+			}
 		}
 		reports.push(await runKind('wilma', 'lesson', lessonWindow, async () => lessonEvents));
 		reports.push(await runKind('wilma', 'exam', examWindow, async () => examEvents));
 		reports.push(await runKind('wilma', 'homework', homeworkWindow, async () => homeworkEvents));
+		reports.push(await runKind('wilma', 'message', messageWindow, async () => messageEvents));
 		if (roleErrors.length > 0) console.warn('[wilma] role errors:', roleErrors.join('; '));
 	} else {
 		const reason =

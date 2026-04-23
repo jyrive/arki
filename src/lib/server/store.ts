@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import type { FamilyEvent, EventSource } from '$lib/types/event';
 import { getDb } from './db';
 
-export type EventKind = 'lesson' | 'exam' | 'homework' | 'calendar';
+export type EventKind = 'lesson' | 'exam' | 'homework' | 'calendar' | 'message';
 
 export interface UpsertStats {
 	inserted: number;
